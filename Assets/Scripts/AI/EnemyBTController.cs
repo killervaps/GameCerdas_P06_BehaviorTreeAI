@@ -2,20 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
-public class EnemyBTController : MonoBehaviour
+public class EnemyBTController : MonoBehaviour, IEnemyBrain
 {
-    // Nilai numerik HARUS sama dengan parameter integer "State" pada Animator
-    // (EnemyAnimation mengirim nilai ini ke Animator).
-    public enum EnemyAction
-    {
-        Patrol = 0,
-        Chase = 1,
-        Attack = 2,
-        Flee = 3,
-        Dead = 4,
-        Search = 5
-    }
-
     // Sub-fase Search: berjalan ke last known position, lalu menoleh.
     private enum SearchPhase
     {
@@ -76,6 +64,8 @@ public class EnemyBTController : MonoBehaviour
     private float searchStartTime;
     private float scanStartTime;
     private float scanBaseYaw;
+
+    public string BrainName => "BT";
 
     public EnemyAction CurrentAction => activeAction;
 

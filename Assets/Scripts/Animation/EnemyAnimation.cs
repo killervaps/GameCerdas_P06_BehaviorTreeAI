@@ -3,18 +3,18 @@ using UnityEngine;
 public class EnemyAnimation : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private EnemyBTController controller;
     [SerializeField] private Animator animator;
 
     private static readonly int StateHash = Animator.StringToHash("State");
 
+    private IEnemyBrain brain;
     private int lastState;
     private bool initialized;
 
     private void Awake()
     {
-        if (controller == null)
-            controller = GetComponentInParent<EnemyBTController>();
+        // Bisa EnemyBTController maupun EnemyUtilityController.
+        brain = GetComponentInParent<IEnemyBrain>();
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
@@ -22,10 +22,10 @@ public class EnemyAnimation : MonoBehaviour
 
     private void Update()
     {
-        if (controller == null || animator == null)
+        if (brain == null || animator == null)
             return;
 
-        int state = ToAnimatorState(controller.CurrentAction);
+        int state = ToAnimatorState(brain.CurrentAction);
 
         // Kirim nilai hanya saat berubah
         if (initialized && state == lastState)
@@ -38,15 +38,11 @@ public class EnemyAnimation : MonoBehaviour
         animator.SetInteger(StateHash, state);
     }
 
-    private int ToAnimatorState(EnemyBTController.EnemyAction action)
+    private int ToAnimatorState(EnemyAction action)
     {
-        // Search punya dua tampilan: saat berjalan ke last known position
-        // memakai animasi jalan (Patrol = 0), saat menoleh memakai Idle (5).
-        if (action == EnemyBTController.EnemyAction.Search &&
-            !controller.IsScanning)
-        {
-            return (int)EnemyBTController.EnemyAction.Patrol;
-        }
+        // Search punya dua tampilan: saat berjalan ke last known position memakai animasi jalan (Patrol = 0), saat menoleh memakai Idle (5).
+        if (action == EnemyAction.Search && !brain.IsScanning)
+            return (int)EnemyAction.Patrol;
 
         return (int)action;
     }

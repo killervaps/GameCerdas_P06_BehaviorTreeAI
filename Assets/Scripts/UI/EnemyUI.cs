@@ -5,19 +5,19 @@ using UnityEngine.UI;
 public class EnemyUI : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private EnemyBTController controller;
     [SerializeField] private EnemyHealth health;
     [SerializeField] private TMP_Text stateText;
     [SerializeField] private Slider healthBar;
 
+    private IEnemyBrain brain;
     private Camera cam;
 
     private void Awake()
     {
         cam = Camera.main;
 
-        if (controller == null)
-            controller = GetComponentInParent<EnemyBTController>();
+        // Bisa EnemyBTController maupun EnemyUtilityController.
+        brain = GetComponentInParent<IEnemyBrain>();
 
         if (health == null)
             health = GetComponentInParent<EnemyHealth>();
@@ -29,11 +29,12 @@ public class EnemyUI : MonoBehaviour
         if (cam != null)
             transform.forward = cam.transform.forward;
 
-        if (controller != null && stateText != null)
+        if (brain != null && stateText != null)
         {
-            EnemyBTController.EnemyAction action = controller.CurrentAction;
+            EnemyAction action = brain.CurrentAction;
 
-            stateText.text = action.ToString();
+            // Label otak membedakan enemy BT dan Utility saat tampil bersamaan.
+            stateText.text = "[" + brain.BrainName + "] " + action;
             stateText.color = ActionColor(action);
         }
 
@@ -41,15 +42,15 @@ public class EnemyUI : MonoBehaviour
             healthBar.value = health.CurrentHealth / health.MaxHealth;
     }
 
-    private Color ActionColor(EnemyBTController.EnemyAction action)
+    private Color ActionColor(EnemyAction action)
     {
         switch (action)
         {
-            case EnemyBTController.EnemyAction.Patrol: return Color.green;
-            case EnemyBTController.EnemyAction.Chase: return Color.yellow;
-            case EnemyBTController.EnemyAction.Attack: return Color.red;
-            case EnemyBTController.EnemyAction.Flee: return Color.cyan;
-            case EnemyBTController.EnemyAction.Search: return new Color(1f, 0.5f, 0f);
+            case EnemyAction.Patrol: return Color.green;
+            case EnemyAction.Chase: return Color.yellow;
+            case EnemyAction.Attack: return Color.red;
+            case EnemyAction.Flee: return Color.cyan;
+            case EnemyAction.Search: return new Color(1f, 0.5f, 0f);
             default: return Color.gray;
         }
     }

@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class PlayerAttackTest : MonoBehaviour
 {
-    [SerializeField] private EnemyHealth enemy;
     [SerializeField] private float attackDistance = 3f;
     [SerializeField] private float damage = 20f;
 
@@ -36,22 +35,42 @@ public class PlayerAttackTest : MonoBehaviour
 
     private void TryAttackEnemy()
     {
-        if (enemy == null)
+        EnemyHealth target = FindNearestEnemy();
+
+        if (target == null)
             return;
 
-        float distance =
-            Vector3.Distance(
-                transform.position,
-                enemy.transform.position
-            );
+        target.TakeDamage(damage);
 
-        if (distance <= attackDistance)
+        Debug.Log(
+            "Player attacks " + target.name + "!"
+        );
+    }
+
+    // Menyerang satu enemy hidup yang paling dekat dalam attackDistance.
+    private EnemyHealth FindNearestEnemy()
+    {
+        EnemyHealth nearest = null;
+        float nearestDistance = attackDistance;
+
+        foreach (EnemyHealth candidate in EnemyHealth.Active)
         {
-            enemy.TakeDamage(damage);
+            if (candidate.IsDead)
+                continue;
 
-            Debug.Log(
-                "Player attacks Enemy!"
-            );
+            float distance =
+                Vector3.Distance(
+                    transform.position,
+                    candidate.transform.position
+                );
+
+            if (distance <= nearestDistance)
+            {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
         }
+
+        return nearest;
     }
 }

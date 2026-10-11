@@ -1,7 +1,14 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class EnemyHealth : MonoBehaviour
 {
+    // Daftar enemy yang sedang aktif, dipakai player untuk memilih target terdekat. 
+    // Enemy yang di-SetActive(false) otomatis tidak ikut.
+    private static readonly List<EnemyHealth> active = new List<EnemyHealth>();
+
+    public static IReadOnlyList<EnemyHealth> Active => active;
+
     [SerializeField] private float maxHealth = 100f;
 
     public float CurrentHealth { get; private set; }
@@ -14,6 +21,16 @@ public class EnemyHealth : MonoBehaviour
     private void Awake()
     {
         CurrentHealth = maxHealth;
+    }
+
+    private void OnEnable()
+    {
+        active.Add(this);
+    }
+
+    private void OnDisable()
+    {
+        active.Remove(this);
     }
 
     public void TakeDamage(float damage)
