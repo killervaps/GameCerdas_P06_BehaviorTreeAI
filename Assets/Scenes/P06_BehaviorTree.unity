@@ -1795,7 +1795,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: 0, z: -190.57571, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -1902,6 +1902,7 @@ MonoBehaviour:
   - {fileID: 1428770936}
   safePoint: {fileID: 946479262}
   health: {fileID: 868000252}
+  personality: {fileID: 11400000, guid: dea712bea3734dcca4e99a77d6550b95, type: 2}
   visionRange: 10
   visionAngle: 90
   obstacleMask:
@@ -2180,6 +2181,7 @@ MonoBehaviour:
   - {fileID: 896278208}
   safePoint: {fileID: 946479262}
   health: {fileID: 928035097}
+  personality: {fileID: 11400000, guid: cadf2cdb363f497096515320adc49038, type: 2}
   visionRange: 10
   visionAngle: 90
   obstacleMask:
@@ -3759,7 +3761,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -78.7245, w: 0}
+  m_margin: {x: 0, y: 0, z: -195.2243, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0

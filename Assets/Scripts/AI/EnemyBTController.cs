@@ -18,6 +18,9 @@ public class EnemyBTController : MonoBehaviour, IEnemyBrain
     [SerializeField] private Transform safePoint;
     [SerializeField] private EnemyHealth health;
 
+    // Opsional: jika diisi, menimpa nilai Perception, Combat, Flee, Search, dan Movement di bawah saat game dimulai.
+    [SerializeField] private EnemyPersonality personality;
+
     [Header("Perception")]
     [SerializeField] private float visionRange = 10f;
     [SerializeField] private float visionAngle = 90f;
@@ -65,7 +68,10 @@ public class EnemyBTController : MonoBehaviour, IEnemyBrain
     private float scanStartTime;
     private float scanBaseYaw;
 
-    public string BrainName => "BT";
+    public string BrainName =>
+        personality != null
+            ? "BT/" + personality.DisplayName
+            : "BT";
 
     public EnemyAction CurrentAction => activeAction;
 
@@ -95,6 +101,33 @@ public class EnemyBTController : MonoBehaviour, IEnemyBrain
 
         if (player != null)
             playerHealth = player.GetComponent<PlayerHealth>();
+
+        ApplyPersonality();
+    }
+
+    private void ApplyPersonality()
+    {
+        if (personality == null)
+            return;
+
+        visionRange = personality.VisionRange;
+        visionAngle = personality.VisionAngle;
+
+        attackRange = personality.AttackRange;
+        attackExitRange = personality.AttackExitRange;
+        attackCooldown = personality.AttackCooldown;
+        attackDamage = personality.AttackDamage;
+
+        // BT memakai ambang HP absolut, sedangkan personality memakai rasio.
+        lowHealthThreshold =
+            personality.FleeStartHealthRatio * health.MaxHealth;
+        safeDistance = personality.SafeDistance;
+
+        searchScanDuration = personality.SearchScanDuration;
+
+        patrolSpeed = personality.PatrolSpeed;
+        chaseSpeed = personality.ChaseSpeed;
+        fleeSpeed = personality.FleeSpeed;
     }
 
     private void Start()

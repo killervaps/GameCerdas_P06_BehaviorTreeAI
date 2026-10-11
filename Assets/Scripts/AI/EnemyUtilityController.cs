@@ -19,6 +19,9 @@ public class EnemyUtilityController : MonoBehaviour, IEnemyBrain
     [SerializeField] private Transform safePoint;
     [SerializeField] private EnemyHealth health;
 
+    // Opsional: jika diisi, menimpa nilai Perception, Combat, Flee, Search, Movement, dan kurva fleeUrgencyByHealth saat game dimulai.
+    [SerializeField] private EnemyPersonality personality;
+
     [Header("Perception")]
     [SerializeField] private float visionRange = 10f;
     [SerializeField] private float visionAngle = 90f;
@@ -99,7 +102,10 @@ public class EnemyUtilityController : MonoBehaviour, IEnemyBrain
     private float scanStartTime;
     private float scanBaseYaw;
 
-    public string BrainName => "Utility";
+    public string BrainName =>
+        personality != null
+            ? "Utility/" + personality.DisplayName
+            : "Utility";
 
     public EnemyAction CurrentAction => activeAction;
 
@@ -140,6 +146,45 @@ public class EnemyUtilityController : MonoBehaviour, IEnemyBrain
 
         if (player != null)
             playerHealth = player.GetComponent<PlayerHealth>();
+
+        ApplyPersonality();
+    }
+
+    private void ApplyPersonality()
+    {
+        if (personality == null)
+            return;
+
+        visionRange = personality.VisionRange;
+        visionAngle = personality.VisionAngle;
+
+        attackRange = personality.AttackRange;
+        attackExitRange = personality.AttackExitRange;
+        attackCooldown = personality.AttackCooldown;
+        attackDamage = personality.AttackDamage;
+
+        safeDistance = personality.SafeDistance;
+
+        searchScanDuration = personality.SearchScanDuration;
+
+        patrolSpeed = personality.PatrolSpeed;
+        chaseSpeed = personality.ChaseSpeed;
+        fleeSpeed = personality.FleeSpeed;
+
+        // Utility tidak memakai ambang tetap: rasio HP mulai kabur diterjemahkan menjadi kurva. 
+        // Urgensi penuh di bawah rasio itu dan turun ke nol 0.2 di atasnya (bentuk yang sama dengan kurva bawaan untuk rasio 0.3).
+        float start = Mathf.Clamp(
+            personality.FleeStartHealthRatio,
+            0.05f,
+            0.8f
+        );
+
+        fleeUrgencyByHealth =
+            new AnimationCurve(
+                new Keyframe(0f, 1f),
+                new Keyframe(start, 1f),
+                new Keyframe(start + 0.2f, 0f)
+            );
     }
 
     private void Start()
@@ -216,6 +261,10 @@ public class EnemyUtilityController : MonoBehaviour, IEnemyBrain
     {
         if (!hasLastKnownPosition)
             return 1f;
+
+        // Setelah tiba, enemy menuntaskan scan seperti pada BT; kesabaran hanya membatasi perjalanan menuju last known position.
+        if (searchPhase == SearchPhase.Scan)
+            return 0f;
 
         return Mathf.Clamp01(
             (Time.time - lastSeenTime) / searchPatience
