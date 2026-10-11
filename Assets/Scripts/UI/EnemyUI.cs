@@ -49,6 +49,7 @@ public class EnemyUI : MonoBehaviour
             case EnemyBTController.EnemyAction.Chase: return Color.yellow;
             case EnemyBTController.EnemyAction.Attack: return Color.red;
             case EnemyBTController.EnemyAction.Flee: return Color.cyan;
+            case EnemyBTController.EnemyAction.Search: return new Color(1f, 0.5f, 0f);
             default: return Color.gray;
         }
     }

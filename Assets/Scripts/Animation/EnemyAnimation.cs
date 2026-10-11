@@ -8,7 +8,7 @@ public class EnemyAnimation : MonoBehaviour
 
     private static readonly int StateHash = Animator.StringToHash("State");
 
-    private EnemyBTController.EnemyAction lastAction;
+    private int lastState;
     private bool initialized;
 
     private void Awake()
@@ -25,14 +25,29 @@ public class EnemyAnimation : MonoBehaviour
         if (controller == null || animator == null)
             return;
 
-        // Kirim nilai enum hanya saat action berubah
-        if (initialized && controller.CurrentAction == lastAction)
+        int state = ToAnimatorState(controller.CurrentAction);
+
+        // Kirim nilai hanya saat berubah
+        if (initialized && state == lastState)
             return;
 
         initialized = true;
-        lastAction = controller.CurrentAction;
+        lastState = state;
 
-        // Patrol = 0, Chase = 1, Attack = 2, Flee = 3, Dead = 4
-        animator.SetInteger(StateHash, (int)lastAction);
+        // Patrol = 0, Chase = 1, Attack = 2, Flee = 3, Dead = 4, Search = 5
+        animator.SetInteger(StateHash, state);
+    }
+
+    private int ToAnimatorState(EnemyBTController.EnemyAction action)
+    {
+        // Search punya dua tampilan: saat berjalan ke last known position
+        // memakai animasi jalan (Patrol = 0), saat menoleh memakai Idle (5).
+        if (action == EnemyBTController.EnemyAction.Search &&
+            !controller.IsScanning)
+        {
+            return (int)EnemyBTController.EnemyAction.Patrol;
+        }
+
+        return (int)action;
     }
 }

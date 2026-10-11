@@ -5,14 +5,23 @@ using UnityEngine.AI;
 public class EnemyBTController : MonoBehaviour
 {
     // Nilai numerik HARUS sama dengan parameter integer "State" pada Animator
-    // (EnemyAnimation mengirim (int)CurrentAction ke Animator).
+    // (EnemyAnimation mengirim nilai ini ke Animator).
     public enum EnemyAction
     {
         Patrol = 0,
         Chase = 1,
         Attack = 2,
         Flee = 3,
-        Dead = 4
+        Dead = 4,
+        Search = 5
+    }
+
+    // Sub-fase Search: berjalan ke last known position, lalu menoleh.
+    private enum SearchPhase
+    {
+        None,
+        Move,
+        Scan
     }
 
     [Header("References")]
@@ -36,6 +45,13 @@ public class EnemyBTController : MonoBehaviour
     [SerializeField] private float lowHealthThreshold = 30f;
     [SerializeField] private float safeDistance = 12f;
 
+    [Header("Search")]
+    [SerializeField] private float searchSpeed = 3f;
+    [SerializeField] private float searchScanDuration = 4f;
+    [SerializeField] private float searchScanAngle = 70f;
+    [SerializeField] private float searchTimeout = 15f;
+    [SerializeField] private float searchSampleDistance = 2f;
+
     [Header("Movement")]
     [SerializeField] private float patrolSpeed = 2f;
     [SerializeField] private float chaseSpeed = 4f;
@@ -53,7 +69,21 @@ public class EnemyBTController : MonoBehaviour
     // Flee hanya dipicu sekali, sama seperti fleeTriggered pada FSM.
     private bool fleeCompleted = false;
 
+    // Memori Search BT bersifat stateless, jadi posisi terakhir player dan progres pencarian disimpan di sini.
+    private bool hasLastKnownPosition = false;
+    private Vector3 lastKnownPosition;
+    private SearchPhase searchPhase = SearchPhase.None;
+    private float searchStartTime;
+    private float scanStartTime;
+    private float scanBaseYaw;
+
     public EnemyAction CurrentAction => activeAction;
+
+    // True saat enemy sudah tiba di last known position dan sedang menoleh
+    // (dipakai EnemyAnimation untuk memilih animasi Idle).
+    public bool IsScanning =>
+        activeAction == EnemyAction.Search &&
+        searchPhase == SearchPhase.Scan;
 
     private void Awake()
     {
@@ -154,6 +184,19 @@ public class EnemyBTController : MonoBehaviour
             );
 
         // ------------------------------
+        // SEARCH
+        // ------------------------------
+
+        BTNode searchSequence =
+            new SequenceNode(
+                new List<BTNode>
+                {
+                    new ConditionNode(HasLastKnownPosition),
+                    new ActionNode(SearchLastKnownPosition)
+                }
+            );
+
+        // ------------------------------
         // PATROL
         // ------------------------------
 
@@ -172,6 +215,7 @@ public class EnemyBTController : MonoBehaviour
                     fleeSequence,
                     attackSequence,
                     chaseSequence,
+                    searchSequence,
                     patrolAction
                 }
             );
@@ -190,6 +234,11 @@ public class EnemyBTController : MonoBehaviour
     {
         return !fleeCompleted &&
                health.CurrentHealth <= lowHealthThreshold;
+    }
+
+    private bool HasLastKnownPosition()
+    {
+        return hasLastKnownPosition;
     }
 
     private bool IsPlayerInAttackRange()
@@ -306,6 +355,8 @@ public class EnemyBTController : MonoBehaviour
 
         SetAction(EnemyAction.Chase);
 
+        RememberPlayerPosition();
+
         agent.isStopped = false;
         agent.speed = chaseSpeed;
         agent.stoppingDistance =
@@ -323,6 +374,8 @@ public class EnemyBTController : MonoBehaviour
             return NodeState.Failure;
 
         SetAction(EnemyAction.Attack);
+
+        RememberPlayerPosition();
 
         agent.isStopped = true;
 
@@ -357,6 +410,9 @@ public class EnemyBTController : MonoBehaviour
 
         SetAction(EnemyAction.Flee);
 
+        // Enemy yang kabur tidak boleh kembali mencari ke arah player.
+        ClearLastKnownPosition();
+
         agent.isStopped = false;
         agent.speed = fleeSpeed;
         agent.stoppingDistance = 0.5f;
@@ -389,6 +445,111 @@ public class EnemyBTController : MonoBehaviour
         }
 
         return NodeState.Running;
+    }
+
+    // Mencari ke last known position: Move (berjalan ke sana) lalu scan (berhenti dan menoleh kiri-kanan) sampai durasi habis.
+    private NodeState SearchLastKnownPosition()
+    {
+        // Player yang sudah mati tidak perlu dicari lagi.
+        if (playerHealth != null && playerHealth.IsDead)
+        {
+            ClearLastKnownPosition();
+
+            return NodeState.Failure;
+        }
+
+        SetAction(EnemyAction.Search);
+
+        if (searchPhase == SearchPhase.None)
+        {
+            // Posisi player bisa berada di luar NavMesh (misalnya di atas obstacle), jadi di-snap ke titik NavMesh terdekat.
+            NavMeshHit hit;
+
+            if (!NavMesh.SamplePosition(
+                    lastKnownPosition,
+                    out hit,
+                    searchSampleDistance,
+                    NavMesh.AllAreas))
+            {
+                ClearLastKnownPosition();
+
+                return NodeState.Failure;
+            }
+
+            lastKnownPosition = hit.position;
+            searchStartTime = Time.time;
+            searchPhase = SearchPhase.Move;
+
+            agent.isStopped = false;
+            agent.speed = searchSpeed;
+            agent.stoppingDistance = 0.2f;
+            agent.SetDestination(lastKnownPosition);
+        }
+
+        if (searchPhase == SearchPhase.Move)
+        {
+            bool arrived =
+                !agent.pathPending &&
+                agent.remainingDistance <= 0.5f;
+
+            // Batas waktu total sebagai pengaman jika tujuan tak tercapai.
+            if (Time.time - searchStartTime >= searchTimeout)
+            {
+                ClearLastKnownPosition();
+
+                return NodeState.Success;
+            }
+
+            if (!arrived)
+                return NodeState.Running;
+
+            searchPhase = SearchPhase.Scan;
+            scanStartTime = Time.time;
+            scanBaseYaw = transform.eulerAngles.y;
+
+            agent.isStopped = true;
+            agent.ResetPath();
+        }
+
+        // Scan: satu siklus ayunan kanan-tengah-kiri-tengah selama durasi scan. Timer dihitung sejak tiba di tujuan.
+        float elapsed = Time.time - scanStartTime;
+
+        if (elapsed >= searchScanDuration)
+        {
+            ClearLastKnownPosition();
+
+            return NodeState.Success;
+        }
+
+        float yawOffset =
+            Mathf.Sin(
+                elapsed / searchScanDuration
+                * Mathf.PI * 2f
+            )
+            * searchScanAngle;
+
+        transform.rotation =
+            Quaternion.Euler(
+                0f,
+                scanBaseYaw + yawOffset,
+                0f
+            );
+
+        return NodeState.Running;
+    }
+
+    // Dipanggil setiap tick saat player terlihat; begitu pandangan hilang, nilai terakhir ini menjadi tujuan Search.
+    private void RememberPlayerPosition()
+    {
+        lastKnownPosition = player.position;
+        hasLastKnownPosition = true;
+        searchPhase = SearchPhase.None;
+    }
+
+    private void ClearLastKnownPosition()
+    {
+        hasLastKnownPosition = false;
+        searchPhase = SearchPhase.None;
     }
 
     private NodeState Die()
@@ -470,6 +631,17 @@ public class EnemyBTController : MonoBehaviour
             transform.position,
             attackExitRange
         );
+
+        // Last Known Position
+        if (hasLastKnownPosition)
+        {
+            Gizmos.color = Color.blue;
+
+            Gizmos.DrawWireSphere(
+                lastKnownPosition,
+                0.4f
+            );
+        }
 
         // FOV direction
         Gizmos.color = Color.yellow;
